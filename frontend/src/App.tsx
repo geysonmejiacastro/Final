@@ -1,3 +1,4 @@
+// frontend/src/App.tsx
 import { useEffect, useMemo, useState } from "react";
 import { api, type Item } from "./api";
 
@@ -15,7 +16,7 @@ export default function App() {
   // Search
   const [search, setSearch] = useState("");
 
-  // Edit state (edit one item at a time)
+  // Edit one item at a time
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
 
@@ -25,8 +26,8 @@ export default function App() {
     try {
       const res = await api.get<Item[]>("/api/items");
       setItems(res.data);
-    } catch (e: any) {
-      setError(e?.message || "Failed to load items");
+    } catch {
+      setError("Unable to connect to server. Is the backend running?");
     } finally {
       setStatus("idle");
     }
@@ -60,8 +61,8 @@ export default function App() {
       setName("");
       setCategory("");
       await loadItems();
-    } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || "Failed to add item");
+    } catch {
+      setError("Failed to add item. Check backend and database connection.");
     } finally {
       setStatus("idle");
     }
@@ -82,6 +83,7 @@ export default function App() {
   async function saveEdit(id: number) {
     setError("");
     const nextName = editName.trim();
+
     if (!nextName) {
       setError("Name cannot be empty.");
       return;
@@ -89,15 +91,15 @@ export default function App() {
 
     setStatus("saving");
     try {
-      // Your current backend only updates name, so we send { name }
+      // Your backend currently updates name only
       await api.put(`/api/items/${id}`, { name: nextName });
 
-      // Update local state immediately
+      // Update local state
       setItems((prev) => prev.map((i) => (i.id === id ? { ...i, name: nextName } : i)));
 
       cancelEdit();
-    } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || "Update failed");
+    } catch {
+      setError("Update failed. Check backend.");
     } finally {
       setStatus("idle");
     }
@@ -106,16 +108,15 @@ export default function App() {
   async function deleteItem(id: number) {
     setError("");
 
-    // Optimistic UI (remove immediately, rollback if failure)
+    // Optimistic UI + rollback on failure
     const snapshot = items;
     setItems((prev) => prev.filter((i) => i.id !== id));
 
     try {
       await api.delete(`/api/items/${id}`);
-      // success, do nothing
-    } catch (e: any) {
+    } catch {
       setItems(snapshot);
-      setError(e?.response?.data?.message || e?.message || "Delete failed");
+      setError("Delete failed. Check backend.");
     }
   }
 
@@ -167,8 +168,18 @@ export default function App() {
           />
         </div>
 
+        {/* Clean error box (no background image / no overlay) */}
         {error && (
-          <div style={{ marginTop: 12, padding: 12, borderRadius: 10, border: "1px solid #f5c2c7", background: "#f8d7da" }}>
+          <div
+            style={{
+              marginTop: 16,
+              padding: 12,
+              borderRadius: 8,
+              backgroundColor: "#fee2e2",
+              color: "#7f1d1d",
+              border: "1px solid #fecaca",
+            }}
+          >
             {error}
           </div>
         )}
@@ -189,7 +200,7 @@ export default function App() {
                   border: "1px solid #ddd",
                   borderRadius: 10,
                   display: "grid",
-                  gap: 8
+                  gap: 8,
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
