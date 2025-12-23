@@ -6,7 +6,7 @@ type Status = "idle" | "loading" | "saving";
 export default function App() {
   const [items, setItems] = useState<Item[]>([]);
   const [status, setStatus] = useState<Status>("idle");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string>("");
 
   // Create form
   const [name, setName] = useState("");
@@ -16,11 +16,13 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  // UI info
+  // Edit state
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+
   const isLoading = status === "loading";
   const isSaving = status === "saving";
 
-  // Debounce: wait 350ms after typing stops
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 350);
     return () => clearTimeout(t);
@@ -41,21 +43,18 @@ export default function App() {
     }
   };
 
-  // Initial load
   useEffect(() => {
     fetchItems("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Re-fetch when debounced search changes
   useEffect(() => {
     fetchItems(debouncedSearch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
-  // Count label (purely UI)
   const countLabel = useMemo(() => {
-    if (isLoading) return "Loading...";
+    if (isLoading) return "Loading…";
     return `${items.length} item(s)`;
   }, [items.length, isLoading]);
 
@@ -63,18 +62,17 @@ export default function App() {
     e.preventDefault();
     setError("");
 
-    const trimmedName = name.trim();
-    const trimmedCategory = category.trim();
-
-    // keep validation for later commit (we’ll improve it in commit 4)
-    if (!trimmedName || !trimmedCategory) {
-      setError("Name and category are required.");
+    if (name.trim().length < 2 || category.trim().length < 2) {
+      setError("Name and category must be at least 2 characters.");
       return;
     }
 
     setStatus("saving");
     try {
-      await api.post("/api/items", { name: trimmedName, category: trimmedCategory });
+      await api.post("/api/items", {
+        name: name.trim(),
+        category: category.trim(),
+      });
       setName("");
       setCategory("");
       await fetchItems(debouncedSearch);
@@ -85,10 +83,38 @@ export default function App() {
     }
   };
 
+  const startEdit = (item: Item) => {
+    setEditingId(item.id);
+    setEditName(item.name);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditName("");
+  };
+
+  const saveEdit = async (id: number) => {
+    if (editName.trim().length < 2) {
+      setError("Item name must be at least 2 characters.");
+      return;
+    }
+
+    setStatus("saving");
+    try {
+      await api.put(`/api/items/${id}`, { name: editName.trim() });
+      setItems((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, name: editName.trim() } : i))
+      );
+      cancelEdit();
+    } catch {
+      setError("Failed to update item.");
+    } finally {
+      setStatus("idle");
+    }
+  };
+
   const deleteItem = async (id: number) => {
     setError("");
-
-    // optimistic UI + rollback
     const snapshot = items;
     setItems((prev) => prev.filter((i) => i.id !== id));
 
@@ -96,82 +122,148 @@ export default function App() {
       await api.delete(`/api/items/${id}`);
     } catch {
       setItems(snapshot);
-      setError("Failed to delete item.");
+      setError("Delete failed.");
     }
   };
 
   return (
-    <div className="container">
-      <header className="header">
-        <div>
-          <h1 className="title">Inventory Tracker</h1>
-          <p className="subtitle">Server-side search (debounced) + CRUD</p>
-        </div>
-        <div className="badge">{countLabel}</div>
-      </header>
+    <div className="page">
+      <div className="container">
+        <div className="cardShell">
+          <header className="header">
+            <div>
+              <h1 className="title">Inventory Tracker</h1>
+              <p className="subtitle">
+                Responsive UI • CRUD • Server-side search
+              </p>
+            </div>
 
-      <section className="card">
-        <h2 className="sectionTitle">Add item</h2>
-        <form onSubmit={addItem} className="form">
-          <input
-            className="input"
-            placeholder="Item name (e.g., Lenovo L14)"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={isSaving}
-          />
-          <input
-            className="input"
-            placeholder="Category (e.g., Laptop)"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            disabled={isSaving}
-          />
-          <button className="button" disabled={isSaving}>
-            {isSaving ? "Saving..." : "Add"}
-          </button>
-        </form>
-      </section>
-
-      <section className="card">
-        <div className="row">
-          <h2 className="sectionTitle">Items</h2>
-
-          <input
-            className="input"
-            placeholder="Search by name (server-side)"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            disabled={isSaving}
-          />
-        </div>
-
-        {error && <div className="errorBox">{error}</div>}
-
-        {isLoading && <div className="muted">Loading...</div>}
-
-        {!isLoading && items.length === 0 && (
-          <div className="muted">No items found.</div>
-        )}
-
-        <ul className="list">
-          {items.map((item) => (
-            <li key={item.id} className="listItem">
-              <div>
-                <div className="itemName">{item.name}</div>
-                <div className="muted">
-                  {item.category} • {item.status}
-                </div>
-              </div>
-
-              <button className="button danger" onClick={() => deleteItem(item.id)} disabled={isSaving}>
-                Delete
+            <div className="headerRight">
+              <div className="pill">{countLabel}</div>
+              <button
+                className="button secondary"
+                onClick={() => fetchItems(debouncedSearch)}
+                disabled={isLoading || isSaving}
+              >
+                Refresh
               </button>
-            </li>
-          ))}
-        </ul>
-      </section>
+            </div>
+          </header>
+
+          <main className="main">
+            {error && <div className="errorBox">{error}</div>}
+
+            <div className="grid2">
+              <section className="section">
+                <h2 className="sectionTitle">Add item</h2>
+
+                <form onSubmit={addItem} className="form">
+                  <div className="formRow">
+                    <input
+                      className="input"
+                      placeholder="Item name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      disabled={isSaving}
+                    />
+                    <input
+                      className="input"
+                      placeholder="Category"
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      disabled={isSaving}
+                    />
+                  </div>
+
+                  <button className="button" disabled={isSaving}>
+                    {isSaving ? "Saving…" : "Add"}
+                  </button>
+                </form>
+              </section>
+
+              <section className="section">
+                <h2 className="sectionTitle">Search</h2>
+                <input
+                  className="input"
+                  placeholder="Search items"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  disabled={isSaving || isLoading}
+                />
+              </section>
+            </div>
+
+            <section className="section">
+              <h2 className="sectionTitle">Items</h2>
+
+              {isLoading && <div className="muted">Loading…</div>}
+              {!isLoading && items.length === 0 && (
+                <div className="muted">No items found.</div>
+              )}
+
+              <ul className="list">
+                {items.map((item) => (
+                  <li key={item.id} className="item">
+                    <div className="itemLeft">
+                      {editingId === item.id ? (
+                        <input
+                          className="input"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                        />
+                      ) : (
+                        <div className="itemName">{item.name}</div>
+                      )}
+
+                      <div className="itemMeta">
+                        {item.category} • {item.status}
+                      </div>
+                    </div>
+
+                    <div className="buttonRow">
+                      {editingId === item.id ? (
+                        <>
+                          <button
+                            className="button"
+                            onClick={() => saveEdit(item.id)}
+                            disabled={isSaving}
+                          >
+                            Save
+                          </button>
+                          <button
+                            className="button secondary"
+                            onClick={cancelEdit}
+                            disabled={isSaving}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            className="button secondary"
+                            onClick={() => startEdit(item)}
+                            disabled={isSaving}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="button danger"
+                            onClick={() => deleteItem(item.id)}
+                            disabled={isSaving}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </main>
+        </div>
+      </div>
     </div>
   );
 }
-
