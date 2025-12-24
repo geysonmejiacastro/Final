@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, type Item } from "./api";
+import { api, Item } from "./api";
 
 type Status = "idle" | "loading" | "saving";
 
@@ -8,18 +8,22 @@ export default function App() {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string>("");
 
+  // Create form
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
 
+  // Search (server-side, debounced)
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
+  // Edit state
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
 
   const isLoading = status === "loading";
   const isSaving = status === "saving";
 
+  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 350);
     return () => clearTimeout(t);
@@ -42,10 +46,12 @@ export default function App() {
 
   useEffect(() => {
     fetchItems("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     fetchItems(debouncedSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
   const countLabel = useMemo(() => {
@@ -89,6 +95,8 @@ export default function App() {
   };
 
   const saveEdit = async (id: number) => {
+    setError("");
+
     if (editName.trim().length < 2) {
       setError("Item name must be at least 2 characters.");
       return;
@@ -98,7 +106,9 @@ export default function App() {
     try {
       await api.put(`/api/items/${id}`, { name: editName.trim() });
       setItems((prev) =>
-        prev.map((i) => (i.id === id ? { ...i, name: editName.trim() } : i))
+        prev.map((i) =>
+          i.id === id ? { ...i, name: editName.trim() } : i
+        )
       );
       cancelEdit();
     } catch {
@@ -108,7 +118,7 @@ export default function App() {
     }
   };
 
-  // ✅ COMMIT 1 CHANGE IS HERE
+  // ✅ Delete confirmation (Commit 1, still present)
   const deleteItem = async (id: number) => {
     const confirmed = window.confirm(
       "Are you sure you want to delete this item?"
@@ -134,7 +144,9 @@ export default function App() {
           <header className="header">
             <div>
               <h1 className="title">Inventory Tracker</h1>
-              <p className="subtitle">CRUD + Server-side search</p>
+              <p className="subtitle">
+                Responsive UI • CRUD • Server-side search
+              </p>
             </div>
 
             <div className="headerRight">
@@ -153,37 +165,61 @@ export default function App() {
           <main className="main">
             {error && <div className="errorBox">{error}</div>}
 
-            <section className="section">
-              <h2 className="sectionTitle">Add item</h2>
-              <form onSubmit={addItem} className="form">
-                <input
-                  className="input"
-                  placeholder="Item name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-                <input
-                  className="input"
-                  placeholder="Category"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                />
-                <button className="button">Add</button>
-              </form>
-            </section>
+            <div className="grid2">
+              <section className="section">
+                <h2 className="sectionTitle">Add item</h2>
 
-            <section className="section">
-              <h2 className="sectionTitle">Search</h2>
-              <input
-                className="input"
-                placeholder="Search items"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </section>
+                <form onSubmit={addItem} className="form">
+                  <div className="formRow">
+                    <input
+                      className="input"
+                      placeholder="Item name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      disabled={isSaving}
+                    />
+                    <input
+                      className="input"
+                      placeholder="Category"
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      disabled={isSaving}
+                    />
+                  </div>
+
+                  <button className="button" disabled={isSaving} type="submit">
+                    {isSaving ? "Saving…" : "Add"}
+                  </button>
+                </form>
+              </section>
+
+              <section className="section">
+                <h2 className="sectionTitle">Search</h2>
+                <input
+                  className="input"
+                  placeholder="Search items (server-side)"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  disabled={isSaving || isLoading}
+                />
+              </section>
+            </div>
 
             <section className="section">
               <h2 className="sectionTitle">Items</h2>
+
+              {/* ✅ COMMIT 3: Improved loading + empty states */}
+              {isLoading && (
+                <div className="muted">
+                  Loading items from server…
+                </div>
+              )}
+
+              {!isLoading && items.length === 0 && (
+                <div className="muted">
+                  No items found. Try adding one above or adjusting your search.
+                </div>
+              )}
 
               <ul className="list">
                 {items.map((item) => (
@@ -194,10 +230,12 @@ export default function App() {
                           className="input"
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
+                          disabled={isSaving}
                         />
                       ) : (
                         <div className="itemName">{item.name}</div>
                       )}
+
                       <div className="itemMeta">
                         {item.category} • {item.status}
                       </div>
@@ -209,12 +247,16 @@ export default function App() {
                           <button
                             className="button"
                             onClick={() => saveEdit(item.id)}
+                            disabled={isSaving}
+                            type="button"
                           >
                             Save
                           </button>
                           <button
                             className="button secondary"
                             onClick={cancelEdit}
+                            disabled={isSaving}
+                            type="button"
                           >
                             Cancel
                           </button>
@@ -224,12 +266,16 @@ export default function App() {
                           <button
                             className="button secondary"
                             onClick={() => startEdit(item)}
+                            disabled={isSaving}
+                            type="button"
                           >
                             Edit
                           </button>
                           <button
                             className="button danger"
                             onClick={() => deleteItem(item.id)}
+                            disabled={isSaving}
+                            type="button"
                           >
                             Delete
                           </button>
