@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, Item } from "./api";
+import { api, type Item } from "./api";
 
 type Status = "idle" | "loading" | "saving";
 
@@ -8,22 +8,18 @@ export default function App() {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string>("");
 
-  // Create form
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
 
-  // Search (server-side, debounced)
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  // Edit state
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
 
   const isLoading = status === "loading";
   const isSaving = status === "saving";
 
-  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 350);
     return () => clearTimeout(t);
@@ -118,7 +114,6 @@ export default function App() {
     }
   };
 
-  // ✅ Delete confirmation (Commit 1, still present)
   const deleteItem = async (id: number) => {
     const confirmed = window.confirm(
       "Are you sure you want to delete this item?"
@@ -208,11 +203,8 @@ export default function App() {
             <section className="section">
               <h2 className="sectionTitle">Items</h2>
 
-              {/* ✅ COMMIT 3: Improved loading + empty states */}
               {isLoading && (
-                <div className="muted">
-                  Loading items from server…
-                </div>
+                <div className="muted">Loading items from server…</div>
               )}
 
               {!isLoading && items.length === 0 && (
@@ -287,6 +279,19 @@ export default function App() {
               </ul>
             </section>
           </main>
+
+          {/* ✅ FOOTER (NEW COMMIT) */}
+          <footer
+            style={{
+              borderTop: "1px solid #e5e7eb",
+              padding: "14px",
+              textAlign: "center",
+              fontSize: "13px",
+              color: "#6b7280",
+            }}
+          >
+            Built with React, Express, and PostgreSQL • © {new Date().getFullYear()}
+          </footer>
         </div>
       </div>
     </div>
