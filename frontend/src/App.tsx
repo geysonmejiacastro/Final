@@ -8,15 +8,12 @@ export default function App() {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string>("");
 
-  // Create form
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
 
-  // Search (server-side, debounced)
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  // Edit state
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
 
@@ -45,12 +42,10 @@ export default function App() {
 
   useEffect(() => {
     fetchItems("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     fetchItems(debouncedSearch);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
   const countLabel = useMemo(() => {
@@ -113,7 +108,13 @@ export default function App() {
     }
   };
 
+  // ✅ COMMIT 1 CHANGE IS HERE
   const deleteItem = async (id: number) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this item?"
+    );
+    if (!confirmed) return;
+
     setError("");
     const snapshot = items;
     setItems((prev) => prev.filter((i) => i.id !== id));
@@ -133,9 +134,7 @@ export default function App() {
           <header className="header">
             <div>
               <h1 className="title">Inventory Tracker</h1>
-              <p className="subtitle">
-                Responsive UI • CRUD • Server-side search
-              </p>
+              <p className="subtitle">CRUD + Server-side search</p>
             </div>
 
             <div className="headerRight">
@@ -144,6 +143,7 @@ export default function App() {
                 className="button secondary"
                 onClick={() => fetchItems(debouncedSearch)}
                 disabled={isLoading || isSaving}
+                type="button"
               >
                 Refresh
               </button>
@@ -153,53 +153,37 @@ export default function App() {
           <main className="main">
             {error && <div className="errorBox">{error}</div>}
 
-            <div className="grid2">
-              <section className="section">
-                <h2 className="sectionTitle">Add item</h2>
-
-                <form onSubmit={addItem} className="form">
-                  <div className="formRow">
-                    <input
-                      className="input"
-                      placeholder="Item name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      disabled={isSaving}
-                    />
-                    <input
-                      className="input"
-                      placeholder="Category"
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                      disabled={isSaving}
-                    />
-                  </div>
-
-                  <button className="button" disabled={isSaving}>
-                    {isSaving ? "Saving…" : "Add"}
-                  </button>
-                </form>
-              </section>
-
-              <section className="section">
-                <h2 className="sectionTitle">Search</h2>
+            <section className="section">
+              <h2 className="sectionTitle">Add item</h2>
+              <form onSubmit={addItem} className="form">
                 <input
                   className="input"
-                  placeholder="Search items"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  disabled={isSaving || isLoading}
+                  placeholder="Item name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                 />
-              </section>
-            </div>
+                <input
+                  className="input"
+                  placeholder="Category"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                />
+                <button className="button">Add</button>
+              </form>
+            </section>
+
+            <section className="section">
+              <h2 className="sectionTitle">Search</h2>
+              <input
+                className="input"
+                placeholder="Search items"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </section>
 
             <section className="section">
               <h2 className="sectionTitle">Items</h2>
-
-              {isLoading && <div className="muted">Loading…</div>}
-              {!isLoading && items.length === 0 && (
-                <div className="muted">No items found.</div>
-              )}
 
               <ul className="list">
                 {items.map((item) => (
@@ -214,7 +198,6 @@ export default function App() {
                       ) : (
                         <div className="itemName">{item.name}</div>
                       )}
-
                       <div className="itemMeta">
                         {item.category} • {item.status}
                       </div>
@@ -226,14 +209,12 @@ export default function App() {
                           <button
                             className="button"
                             onClick={() => saveEdit(item.id)}
-                            disabled={isSaving}
                           >
                             Save
                           </button>
                           <button
                             className="button secondary"
                             onClick={cancelEdit}
-                            disabled={isSaving}
                           >
                             Cancel
                           </button>
@@ -243,14 +224,12 @@ export default function App() {
                           <button
                             className="button secondary"
                             onClick={() => startEdit(item)}
-                            disabled={isSaving}
                           >
                             Edit
                           </button>
                           <button
                             className="button danger"
                             onClick={() => deleteItem(item.id)}
-                            disabled={isSaving}
                           >
                             Delete
                           </button>
